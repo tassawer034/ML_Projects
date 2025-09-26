@@ -1,0 +1,161 @@
+#!/bin/bash
+
+echo "🚀 Setting up MNIST Logistic Regression project..."
+
+# Create folders
+mkdir -p data
+mkdir -p models
+
+# Create requirements.txt
+cat > requirements.txt <<EOL
+numpy
+pandas
+scikit-learn
+matplotlib
+joblib
+EOL
+
+# Create README.md
+cat > README.md <<EOL
+# MNIST Logistic Regression Project
+
+## Setup
+\`\`\`bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+\`\`\`
+
+## Run Training
+\`\`\`bash
+python train.py
+\`\`\`
+
+## Evaluate
+\`\`\`bash
+python evaluate.py
+\`\`\`
+
+## Predict single image
+\`\`\`bash
+python predict.py
+\`\`\`
+EOL
+
+# Create data_loader.py
+cat > data_loader.py <<'EOL'
+import os
+import struct
+import numpy as np
+
+def load_images(filename):
+    with open(filename, 'rb') as f:
+        magic, num, rows, cols = struct.unpack(">IIII", f.read(16))
+        data = np.frombuffer(f.read(), dtype=np.uint8)
+        data = data.reshape(num, rows * cols)
+    return data
+
+def load_labels(filename):
+    with open(filename, 'rb') as f:
+        magic, num = struct.unpack(">II", f.read(8))
+        labels = np.frombuffer(f.read(), dtype=np.uint8)
+    return labels
+
+def load_mnist_dataset(data_dir):
+    X_train = load_images(os.path.join(data_dir, 'train-images.idx3-ubyte'))
+    y_train = load_labels(os.path.join(data_dir, 'train-labels.idx1-ubyte'))
+    X_test = load_images(os.path.join(data_dir, 't10k-images.idx3-ubyte'))
+    y_test = load_labels(os.path.join(data_dir, 't10k-labels.idx1-ubyte'))
+    return X_train, y_train, X_test, y_test
+EOL
+
+# Create train.py
+cat > train.py <<'EOL'
+import os
+import joblib
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import LogisticRegression
+from data_loader import load_mnist_dataset
+
+def main():
+    data_dir = './data'
+    X_train, y_train, X_test, y_test = load_mnist_dataset(data_dir)
+    X_train, X_test = X_train / 255.0, X_test / 255.0
+
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    model = LogisticRegression(
+        solver='saga',
+        multi_class='multinomial',
+    )
+
+    print("Training model...")
+    model.fit(X_train_scaled, y_train)
+    print("Training complete.")
+
+    os.makedirs('models', exist_ok=True)
+    joblib.dump({'model': model, 'scaler': scaler}, 'models/logreg_mnist.joblib')
+    print("Model saved at models/logreg_mnist.joblib")
+EOL
+
+# Create evaluate.py
+cat > evaluate.py <<'EOL'
+import joblib
+from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
+from data_loader import load_mnist_dataset
+
+def main():
+    data_dir = './data'
+    X_train, y_train, X_test, y_test = load_mnist_dataset(data_dir)
+    X_test = X_test / 255.0
+
+    bundle = joblib.load('models/logreg_mnist.joblib')
+    model, scaler = bundle['model'], bundle['scaler']
+
+    X_test_scaled = scaler.transform(X_test)
+    y_pred = model.predict(X_test_scaled)
+
+    print("Accuracy:", accuracy_score(y_test, y_pred))
+    print("Classification Report:\n", classification_report(y_test, y_pred))
+    print("Confusion Matrix:\n", confusion_matrix(y_test, y_pred))
+
+if __name__ == '__main__':
+    main()
+EOL
+
+# Create predict.py
+cat > predict.py <<'EOL'
+import joblib
+import numpy as np
+
+def main():
+    bundle = joblib.load('models/logreg_mnist.joblib')
+    model, scaler = bundle['model'], bundle['scaler']
+
+    # Example: predict a blank image (all zeros)
+    sample = np.zeros((1, 784))
+    sample_scaled = scaler.transform(sample)
+    prediction = model.predict(sample_scaled)
+    print("Predicted digit:", prediction[0])
+
+if __name__ == '__main__':
+    main()
+EOL
+
+# Setup virtual environment and install dependencies
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+echo "✅ Setup complete! Place MNIST dataset files in ./data and run:"
+echo "   source .venv/bin/activate"
+echo "   python train.py"
+
+if __name__ == '__main__':
+    main()
+        max_iter=100,
+        n_jobs=-1,
+        verbose=1
+
